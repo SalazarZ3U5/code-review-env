@@ -1,0 +1,121 @@
+# ─────────────────────────────────────────────────────────────
+# openenv.yaml — OpenEnv metadata for the Code Review Environment
+# Validated by: openenv validate
+# ─────────────────────────────────────────────────────────────
+
+name: code-review-env
+version: "1.0.0"
+description: >
+  An OpenEnv environment where LLM agents perform code reviews on Python Flask
+  snippets containing planted bugs. Agents must identify exact bug line numbers,
+  explain the vulnerability or failure mode, and suggest correct fixes.
+  Tasks range from obvious runtime crashes to interacting security vulnerabilities.
+  Graders are fully deterministic — no LLM calls, pure keyword and line matching.
+
+author: "your-hf-username"
+
+tags:
+  - code-review
+  - security
+  - flask
+  - python
+  - web-backend
+  - openenv
+
+# ─────────────────────────────────────────────────────────────
+# Tasks
+# ─────────────────────────────────────────────────────────────
+tasks:
+  - name: easy
+    description: >
+      Identify a KeyError crash bug in a Flask user lookup route.
+      The route accesses a dictionary with [] notation instead of .get(),
+      causing an unhandled exception when the user_id does not exist.
+    difficulty: easy
+    max_steps: 1
+    reward_threshold: 0.5
+
+  - name: medium
+    description: >
+      Identify a SQL injection vulnerability in a Flask login route.
+      User input is interpolated directly into a SQL query via an f-string,
+      allowing authentication bypass via injection payloads.
+    difficulty: medium
+    max_steps: 1
+    reward_threshold: 0.5
+
+  - name: hard
+    description: >
+      Identify two interacting bugs in a Flask password reset route.
+      Bug 1: SQL injection in token lookup allows token bypass.
+      Bug 2: MD5 used for password hashing is cryptographically broken.
+      Together they allow an attacker to bypass the reset flow and crack passwords.
+    difficulty: hard
+    max_steps: 1
+    reward_threshold: 0.5
+
+# ─────────────────────────────────────────────────────────────
+# Action Space
+# ─────────────────────────────────────────────────────────────
+action_space:
+  type: object
+  description: "A code review submission from the agent."
+  fields:
+    review_text:
+      type: string
+      description: "Full explanation of bugs found and why they are dangerous."
+    identified_lines:
+      type: array
+      items: integer
+      description: "List of line numbers the agent believes contain bugs."
+    suggested_fix:
+      type: string
+      description: "Proposed corrected code or specific fix description."
+
+# ─────────────────────────────────────────────────────────────
+# Observation Space
+# ─────────────────────────────────────────────────────────────
+observation_space:
+  type: object
+  description: "What the agent sees at the start of each episode."
+  fields:
+    code_snippet:
+      type: string
+      description: "The Python Flask code to review, with line numbers prepended."
+    language:
+      type: string
+      description: "Programming language of the snippet. Always 'python'."
+    task_description:
+      type: string
+      description: "Instructions telling the agent what to look for."
+    step_number:
+      type: integer
+      description: "Current step number. Always 0 at episode start."
+
+# ─────────────────────────────────────────────────────────────
+# Environment Properties
+# ─────────────────────────────────────────────────────────────
+reward_range: [0.0, 1.0]
+max_steps: 1
+episode_type: single-step
+
+# ─────────────────────────────────────────────────────────────
+# Endpoints (OpenEnv spec)
+# ─────────────────────────────────────────────────────────────
+endpoints:
+  reset:
+    method: POST
+    path: /reset
+    description: "Start a new episode. Body: {task: easy|medium|hard}"
+  step:
+    method: POST
+    path: /step
+    description: "Submit a review action. Returns reward and done flag."
+  state:
+    method: GET
+    path: /state
+    description: "Get current environment state."
+  health:
+    method: GET
+    path: /health
+    description: "Health check. Returns 200 OK when server is live."
