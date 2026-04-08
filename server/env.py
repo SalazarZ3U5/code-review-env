@@ -23,7 +23,7 @@ class CodeReviewEnv:
     def _build_observation(self) -> CodeReviewObservation:
         task = TASKS[self.task_name]
         return CodeReviewObservation(
-            code_snippet=task["code_snippet"],
+            code_snippet=task["code"],
             language="python",
             task_description=task["description"],
             step_number=self.step_count,
@@ -65,7 +65,7 @@ class CodeReviewEnv:
     def state(self) -> CodeReviewState:
         return CodeReviewState(
             task_name=self.task_name,
-            current_code=TASKS[self.task_name]["code_snippet"],
+            current_code=TASKS[self.task_name]["code"],
             done=self.done,
             total_reward=self.total_reward,
             step_count=self.step_count,
