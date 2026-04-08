@@ -1,0 +1,16 @@
+[project]
+name = "code-review-env"
+version = "0.1.0"
+description = "Code review evaluation environment"
+authors = [{name = "Your Name"}]
+dependencies = [
+    "openenv-core>=0.2.0",
+    "fastapi",
+    "uvicorn"
+]
+
+[project.scripts]
+server = "server.app:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
