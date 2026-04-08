@@ -170,18 +170,6 @@ async def run_task(task_name: str) -> None:
         flush=True
     )
 
-    error_text = "null" if error_value is None else str(error_value).replace("\n", " ")
-    action_summary = _summarize_action(action)
-    print(
-        f"[STEP] step=1 action={action_summary} "
-        f"reward={reward_value:.2f} done={str(done_value).lower()} error={error_text}"
-    )
-    score = reward_value
-    success = score >= SUCCESS_SCORE_THRESHOLD
-    print(
-        f"[END] success={str(success).lower()} steps=1 score={score:.3f} rewards={reward_value:.2f}"
-    )
-
 
 async def main() -> None:
     _ = IMAGE_NAME
