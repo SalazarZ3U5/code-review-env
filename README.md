@@ -1,3 +1,14 @@
+---
+title: Code Review Env
+emoji: 🐢
+colorFrom: gray
+colorTo: gray
+sdk: docker
+pinned: false
+license: mit
+---
+
+
 # Code Review Environment
 
 ## Overview
@@ -130,16 +141,3 @@ curl -X GET http://localhost:7860/tasks
 ```bash
 ./validate-submission.sh https://your-space.hf.space
 ```
-
----
-title: Code Review Env
-emoji: 🐢
-colorFrom: gray
-colorTo: gray
-sdk: docker
-pinned: false
-license: mit
----
-
-Check out the configuration reference at https://huggingface.co/docs/hub/spaces-config-reference
-
