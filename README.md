@@ -78,11 +78,11 @@ Scoring is deterministic and based on keyword and line checks:
 The hard task splits credit across both bugs while preserving the same total reward range and hallucination penalty behavior. Final reward is clamped to `[0.0, 1.0]`.
 
 ## Baseline Scores
-| Task   | Baseline Score | Model Used |
-|--------|---------------|------------|
-| easy   | TBD           | Qwen2.5-72B |
-| medium | TBD           | Qwen2.5-72B |
-| hard   | TBD           | Qwen2.5-72B |
+| Task   | Baseline Score |  Model Used |
+|--------|----------------|-------------|
+| easy   | 1.00           | Qwen2.5-72B |
+| medium | 1.00           | Qwen2.5-72B |
+| hard   | 1.00           | Qwen2.5-72B |
 
 ## Setup & Usage
 
