@@ -3,7 +3,7 @@ import json
 import os
 from typing import Any, Dict
 
-import httpx
+import urllib.request
 from openai import OpenAI
 
 ENV_NAME = "code-review-env"
@@ -78,17 +78,26 @@ def _summarize_action(action: Dict[str, Any]) -> str:
     summary = f"lines={lines} fix={str(action.get('suggested_fix', ''))[:80]}"
     return summary.replace("\n", " ").strip()[:140]
 
+async def _reset_task(client, task_name: str) -> Dict[str, Any]:
+    data = json.dumps({"task": task_name}).encode()
+    req = urllib.request.Request(
+        f"{ENV_BASE_URL}/reset",
+        data=data,
+        headers={"Content-Type": "application/json"}
+    )
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        return json.loads(resp.read())
 
-async def _reset_task(client: httpx.AsyncClient, task_name: str) -> Dict[str, Any]:
-    response = await client.post(f"{ENV_BASE_URL}/reset", json={"task": task_name})
-    response.raise_for_status()
-    return response.json()
 
-
-async def _step_task(client: httpx.AsyncClient, action: Dict[str, Any]) -> Dict[str, Any]:
-    response = await client.post(f"{ENV_BASE_URL}/step", json=action)
-    response.raise_for_status()
-    return response.json()
+async def _step_task(client, action: Dict[str, Any]) -> Dict[str, Any]:
+    data = json.dumps(action).encode()
+    req = urllib.request.Request(
+        f"{ENV_BASE_URL}/step",
+        data=data,
+        headers={"Content-Type": "application/json"}
+    )
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        return json.loads(resp.read())
 
 
 def _call_llm(code_snippet: str, task_description: str) -> Dict[str, Any]:
@@ -123,30 +132,43 @@ def _call_llm(code_snippet: str, task_description: str) -> Dict[str, Any]:
 
 
 async def run_task(task_name: str) -> None:
-    print(f"[START] task={task_name} env={ENV_NAME} model={MODEL_NAME}")
+    print(f"[START] task={task_name} env={ENV_NAME} model={MODEL_NAME}", flush=True)
     reward_value = 0.0
     done_value = False
-    error_value: Any = None
+    error_value = None
     action = _fallback_action()
 
     try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            reset_payload = await _reset_task(client, task_name)
-            observation = reset_payload.get("observation", {})
-            code_snippet = str(observation.get("code_snippet", ""))
-            task_description = str(observation.get("task_description", ""))
+        reset_payload = await _reset_task(None, task_name)
+        observation = reset_payload.get("observation", {})
+        code_snippet = str(observation.get("code_snippet", ""))
+        task_description = str(observation.get("task_description", ""))
 
-            try:
-                action = _call_llm(code_snippet, task_description)
-            except Exception as llm_exc:  # noqa: BLE001
-                action = _fallback_action()
-                error_value = str(llm_exc)
+        try:
+            action = _call_llm(code_snippet, task_description)
+        except Exception as llm_exc:
+            action = _fallback_action()
+            error_value = str(llm_exc)
 
-            step_payload = await _step_task(client, action)
-            reward_value = float(step_payload.get("reward", 0.0))
-            done_value = bool(step_payload.get("done", False))
-    except Exception as exc:  # noqa: BLE001
+        step_payload = await _step_task(None, action)
+        reward_value = float(step_payload.get("reward", 0.0))
+        done_value = bool(step_payload.get("done", False))
+    except Exception as exc:
         error_value = str(exc)
+
+    error_text = "null" if error_value is None else str(error_value).replace("\n", " ")
+    action_summary = _summarize_action(action)
+    print(
+        f"[STEP]  step=1 action={action_summary} "
+        f"reward={reward_value:.2f} done={str(done_value).lower()} error={error_text}",
+        flush=True
+    )
+    score = reward_value
+    success = score >= SUCCESS_SCORE_THRESHOLD
+    print(
+        f"[END] success={str(success).lower()} steps=1 score={score:.3f} rewards={reward_value:.2f}",
+        flush=True
+    )
 
     error_text = "null" if error_value is None else str(error_value).replace("\n", " ")
     action_summary = _summarize_action(action)
