@@ -94,30 +94,32 @@ async def _step_task(client: httpx.AsyncClient, action: Dict[str, Any]) -> Dict[
 def _call_llm(code_snippet: str, task_description: str) -> Dict[str, Any]:
     if not HF_TOKEN:
         return _fallback_action()
-
-    numbered_code = add_line_numbers(code_snippet)
-    prompt = USER_PROMPT_TEMPLATE.format(
-        task_description=task_description, code_snippet=numbered_code
-    )
-    client = OpenAI(base_url=API_BASE_URL, api_key=HF_TOKEN)
-    completion = client.chat.completions.create(
-        model=MODEL_NAME,
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": prompt},
-        ],
-        temperature=0,
-    )
-    content = completion.choices[0].message.content or ""
-    cleaned = _strip_markdown_fences(content)
-    parsed = json.loads(cleaned)
-    if not isinstance(parsed, dict):
+    try:
+        numbered_code = add_line_numbers(code_snippet)
+        prompt = USER_PROMPT_TEMPLATE.format(
+            task_description=task_description, code_snippet=numbered_code
+        )
+        client = OpenAI(base_url=API_BASE_URL, api_key=HF_TOKEN)
+        completion = client.chat.completions.create(
+            model=MODEL_NAME,
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": prompt},
+            ],
+            temperature=0,
+        )
+        content = completion.choices[0].message.content or ""
+        cleaned = _strip_markdown_fences(content)
+        parsed = json.loads(cleaned)
+        if not isinstance(parsed, dict):
+            return _fallback_action()
+        return {
+            "review_text": str(parsed.get("review_text", "")),
+            "identified_lines": parsed.get("identified_lines", []),
+            "suggested_fix": str(parsed.get("suggested_fix", "")),
+        }
+    except Exception:
         return _fallback_action()
-    return {
-        "review_text": str(parsed.get("review_text", "")),
-        "identified_lines": parsed.get("identified_lines", []),
-        "suggested_fix": str(parsed.get("suggested_fix", "")),
-    }
 
 
 async def run_task(task_name: str) -> None:
