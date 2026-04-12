@@ -8,7 +8,11 @@ dependencies = [
     "uvicorn",
     "pydantic>=2.0.0",
     "openai",
+    "openenv-core>=0.2.0",
 ]
+
+[project.scripts]
+server = "server.main:app"
 
 [tool.setuptools.packages.find]
 where = ["."]
