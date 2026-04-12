@@ -1,140 +1,125 @@
-from typing import Dict, List
+"""
+models.py — Typed Pydantic models for the Prompt Injection Defense Environment.
 
+Three action types (one per step):
+  Step 1 — ClassifyAction
+  Step 2 — SanitizeAction  
+  Step 3 — VerifyAction
+
+One observation type returned after every reset/step:
+  InjectionObservation
+
+One state type returned by /state:
+  InjectionState
+"""
+
+from typing import Any, Dict, List
 from pydantic import BaseModel, Field
 
 
-class CodeReviewAction(BaseModel):
-    """Action payload submitted by the reviewing agent."""
-
-    review_text: str = Field(
+class ClassifyAction(BaseModel):
+    """Step 1 — agent classifies the prompt as safe or malicious."""
+    decision: str = Field(
         ...,
-        description="Full explanation of bugs found, why they are dangerous, and impact.",
+        description="safe | malicious | uncertain"
     )
-    identified_lines: List[int] = Field(
+    threat_type: str = Field(
         ...,
-        description="Exact source line numbers the agent identifies as buggy.",
+        description="direct_injection | indirect_injection | data_injection | none"
     )
-    suggested_fix: str = Field(
+    confidence: float = Field(
         ...,
-        description="Proposed corrected code or concrete remediation guidance.",
+        description="Confidence score 0.0 to 1.0"
+    )
+    reasoning: str = Field(
+        ...,
+        description="One sentence explanation of the classification"
     )
 
-    model_config = {
-        "json_schema_extra": {
-            "examples": [
-                {
-                    "review_text": "Line 11 can raise a KeyError when user_id does not exist.",
-                    "identified_lines": [11],
-                    "suggested_fix": "Use users.get(user_id) and return a 404 when missing.",
-                }
-            ]
-        }
-    }
 
-
-class CodeReviewObservation(BaseModel):
-    """Observation shown to the agent for a given task."""
-
-    code_snippet: str = Field(..., description="The code snippet to review.")
-    language: str = Field(
-        default="python",
-        description="Programming language of the snippet, defaults to python.",
+class SanitizeAction(BaseModel):
+    """Step 2 — agent removes injection while preserving legitimate content."""
+    sanitized_prompt: str = Field(
+        ...,
+        description="Cleaned version of the input with injections removed"
     )
-    task_description: str = Field(
-        ..., description="Task instructions describing what issues to identify."
+    removed_segments: List[str] = Field(
+        ...,
+        description="List of exact text segments that were removed"
+    )
+    sanitization_method: str = Field(
+        ...,
+        description="redaction | replacement | restructure"
+    )
+
+
+class VerifyAction(BaseModel):
+    """Step 3 — agent verifies the sanitized prompt is safe."""
+    verdict: str = Field(
+        ...,
+        description="safe | still_malicious"
+    )
+    remaining_risks: List[str] = Field(
+        ...,
+        description="Any remaining risks still present in the sanitized prompt"
+    )
+    final_prompt: str = Field(
+        ...,
+        description="The approved safe version to pass to the downstream LLM"
+    )
+
+
+class InjectionObservation(BaseModel):
+    """What the agent sees at each step."""
+    raw_prompt: str = Field(
+        ...,
+        description="The original prompt the agent must defend against"
     )
     step_number: int = Field(
-        default=0,
-        description="Current step index in the episode, starts at 0.",
+        default=1,
+        description="Current step: 1=classify, 2=sanitize, 3=verify"
+    )
+    task_name: str = Field(
+        ...,
+        description="easy | medium | hard"
+    )
+    task_description: str = Field(
+        ...,
+        description="Instructions for the agent"
+    )
+    previous_actions: List[Dict[str, Any]] = Field(
+        default_factory=list,
+        description="All actions taken so far this episode"
+    )
+    feedback: str = Field(
+        default="",
+        description="Grader feedback from the previous step"
+    )
+    current_phase: str = Field(
+        default="classify",
+        description="classify | sanitize | verify | complete"
     )
 
-    model_config = {
-        "json_schema_extra": {
-            "examples": [
-                {
-                    "code_snippet": "from flask import Flask",
-                    "language": "python",
-                    "task_description": "Review this route for bugs.",
-                    "step_number": 0,
-                }
-            ]
-        }
-    }
 
-
-class CodeReviewState(BaseModel):
-    """Internal environment state representation."""
-
-    task_name: str = Field(..., description="Currently selected task name.")
-    current_code: str = Field(..., description="Current task code snippet.")
-    done: bool = Field(..., description="Whether the episode is finished.")
-    total_reward: float = Field(..., description="Cumulative reward for the episode.")
-    step_count: int = Field(..., description="How many steps have been executed.")
-
-    model_config = {
-        "json_schema_extra": {
-            "examples": [
-                {
-                    "task_name": "easy",
-                    "current_code": "from flask import Flask, jsonify",
-                    "done": False,
-                    "total_reward": 0.0,
-                    "step_count": 0,
-                }
-            ]
-        }
-    }
+class InjectionState(BaseModel):
+    """Internal environment state returned by /state."""
+    task_name: str
+    raw_prompt: str
+    done: bool
+    total_reward: float
+    step_count: int
+    current_phase: str
 
 
 class StepResult(BaseModel):
-    """Response payload returned by /step."""
-
-    observation: CodeReviewObservation = Field(
-        ..., description="Post-step observation for the agent."
-    )
-    reward: float = Field(..., description="Reward awarded for this step.")
-    done: bool = Field(..., description="Whether the episode has completed.")
-    info: Dict = Field(default_factory=dict, description="Auxiliary metadata for debugging.")
-
-    model_config = {
-        "json_schema_extra": {
-            "examples": [
-                {
-                    "observation": {
-                        "code_snippet": "from flask import Flask",
-                        "language": "python",
-                        "task_description": "Review this route for bugs.",
-                        "step_number": 1,
-                    },
-                    "reward": 0.8,
-                    "done": True,
-                    "info": {"task": "easy", "step_count": 1, "total_reward": 0.8},
-                }
-            ]
-        }
-    }
+    """Return type of the /step endpoint."""
+    observation: InjectionObservation
+    reward: float
+    done: bool
+    info: Dict[str, Any] = Field(default_factory=dict)
 
 
 class ResetResult(BaseModel):
-    """Response payload returned by /reset."""
-
-    observation: CodeReviewObservation = Field(
-        ..., description="Initial observation after environment reset."
-    )
-    done: bool = Field(default=False, description="Episode done flag, false at reset.")
-
-    model_config = {
-        "json_schema_extra": {
-            "examples": [
-                {
-                    "observation": {
-                        "code_snippet": "from flask import Flask",
-                        "language": "python",
-                        "task_description": "Review this route for bugs.",
-                        "step_number": 0,
-                    },
-                    "done": False,
-                }
-            ]
-        }
-    }
+    """Return type of the /reset endpoint."""
+    observation: InjectionObservation
+    done: bool = False
