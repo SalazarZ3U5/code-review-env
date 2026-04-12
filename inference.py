@@ -7,10 +7,10 @@ from typing import Any, Dict, List
 from openai import OpenAI
 
 ENV_NAME = "prompt-injection-defense-env"
-ENV_BASE_URL = os.getenv("ENV_BASE_URL", "https://salazarsnow-code-review-env.hf.space")
-API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
+ENV_BASE_URL = os.getenv("ENV_BASE_URL", "https://salazarsnow-prompt-injection-defense-env.hf.space")
+API_BASE_URL = os.environ["API_BASE_URL"]
 MODEL_NAME = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-72B-Instruct")
-HF_TOKEN = os.getenv("HF_TOKEN") or os.getenv("API_KEY", "")
+HF_TOKEN = os.environ["API_KEY"]
 IMAGE_NAME = os.getenv("IMAGE_NAME", "")
 MAX_STEPS = 3
 SUCCESS_SCORE_THRESHOLD = 0.5
